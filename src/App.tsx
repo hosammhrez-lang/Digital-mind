@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { User } from 'firebase/auth';
 import {
   EditionMode,
   Lang,
@@ -6,6 +7,7 @@ import {
   NavTab,
   SavedStudySummary,
   SchoolNewsDispatch,
+  SiteHomepageSettings,
   StudentSubmission,
   StudyMode,
 } from './types/magazine';
@@ -13,8 +15,27 @@ import { UI_COPY } from './data/translations';
 import {
   INITIAL_SCHOOL_NEWS,
   INITIAL_SUBMISSIONS,
+  ISSUE_01_ARTICLES,
   SCHOOL_FACEBOOK_URL,
 } from './data/magazineData';
+import {
+  googleSignIn,
+  initAuth,
+  logout,
+  testConnection,
+} from './lib/firebase';
+import {
+  checkIsAdmin,
+  createSubmissionInDb,
+  DEFAULT_HOMEPAGE_SETTINGS,
+  deleteSchoolNewsFromDb,
+  saveSchoolNewsToDb,
+  subscribeArticles,
+  subscribeHomepageSettings,
+  subscribeSchoolNews,
+  subscribeSubmissions,
+  upvoteSubmissionInDb,
+} from './services/cmsDatabase';
 import { addUniqueId, toggleIdInList } from './utils/magazineLogic';
 import { TopBar } from './components/TopBar';
 import { IssueView } from './components/IssueView';
@@ -23,10 +44,9 @@ import { LabsView } from './components/LabsView';
 import { GlossaryView } from './components/GlossaryView';
 import { ShowcaseView } from './components/ShowcaseView';
 import { LaunchHubView } from './components/LaunchHubView';
+import { AdminControlPanelView } from './components/AdminControlPanelView';
 import { ArticleReaderModal } from './components/ArticleReaderModal';
 
-const STORAGE_KEY = 'els_digital_minds_submissions_v1';
-const NEWS_STORAGE_KEY = 'els_digital_minds_news_v3';
 const BOOKMARKS_KEY = 'els_digital_minds_bookmarks_v1';
 const READ_PROGRESS_KEY = 'els_digital_minds_read_v1';
 const SUMMARIES_KEY = 'els_nuha_summaries_v1';
@@ -43,35 +63,24 @@ export default function App() {
     nonce: number;
   } | null>(null);
 
-  const [submissions, setSubmissions] = useState<StudentSubmission[]>(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // Fallback to initial seed data
-    }
-    return INITIAL_SUBMISSIONS;
-  });
+  // Firebase Auth & Google Drive OAuth (in-memory only)
+  const [user, setUser] = useState<User | null>(null);
+  const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
-  const [schoolNews, setSchoolNews] = useState<SchoolNewsDispatch[]>(() => {
-    try {
-      const saved = window.localStorage.getItem(NEWS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // Fallback to initial news seed
-    }
-    return INITIAL_SCHOOL_NEWS;
-  });
+  // Live Cloud Firestore CMS state with static editorial defaults before seeding
+  const [siteSettings, setSiteSettings] = useState<SiteHomepageSettings>(DEFAULT_HOMEPAGE_SETTINGS);
+  const [isSettingsFromDb, setIsSettingsFromDb] = useState(false);
+
+  const [articles, setArticles] = useState<MagazineArticle[]>(ISSUE_01_ARTICLES);
+  const [isArticlesFromDb, setIsArticlesFromDb] = useState(false);
+
+  const [schoolNews, setSchoolNews] = useState<SchoolNewsDispatch[]>(INITIAL_SCHOOL_NEWS);
+  const [isNewsFromDb, setIsNewsFromDb] = useState(false);
+
+  const [submissions, setSubmissions] = useState<StudentSubmission[]>(INITIAL_SUBMISSIONS);
+  const [isSubmissionsFromDb, setIsSubmissionsFromDb] = useState(false);
 
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
     try {
@@ -118,20 +127,48 @@ export default function App() {
   }, [lang]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
-    } catch {
-      // Ignore storage quota errors
-    }
-  }, [submissions]);
+    void testConnection();
+    const unsubAuth = initAuth((authUser, token) => {
+      setUser(authUser);
+      setDriveAccessToken(token);
+      if (authUser) {
+        void checkIsAdmin(authUser).then((adminStatus) => {
+          setIsAdmin(adminStatus);
+          setIsAuthReady(true);
+        });
+      } else {
+        setIsAdmin(false);
+        setIsAuthReady(true);
+      }
+    });
+    return () => unsubAuth();
+  }, []);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(NEWS_STORAGE_KEY, JSON.stringify(schoolNews));
-    } catch {
-      // Ignore storage quota errors
-    }
-  }, [schoolNews]);
+    const unsubSettings = subscribeHomepageSettings((nextSettings, fromDb) => {
+      setSiteSettings(nextSettings);
+      setIsSettingsFromDb(fromDb);
+    });
+    const unsubArticles = subscribeArticles(isAdmin, (nextArticles, fromDb) => {
+      setArticles(nextArticles);
+      setIsArticlesFromDb(fromDb);
+    });
+    const unsubNews = subscribeSchoolNews(isAdmin, (nextNews, fromDb) => {
+      setSchoolNews(nextNews);
+      setIsNewsFromDb(fromDb);
+    });
+    const unsubSubs = subscribeSubmissions(isAdmin, (nextSubs, fromDb) => {
+      setSubmissions(nextSubs);
+      setIsSubmissionsFromDb(fromDb);
+    });
+
+    return () => {
+      unsubSettings();
+      unsubArticles();
+      unsubNews();
+      unsubSubs();
+    };
+  }, [isAdmin]);
 
   useEffect(() => {
     try {
@@ -159,6 +196,30 @@ export default function App() {
 
   const copy = UI_COPY[lang];
 
+  const handleSignIn = async () => {
+    const result = await googleSignIn();
+    setUser(result.user);
+    setDriveAccessToken(result.accessToken);
+    const adminStatus = await checkIsAdmin(result.user);
+    setIsAdmin(adminStatus);
+  };
+
+  const handleRequestDriveSignIn = async (): Promise<string | null> => {
+    const result = await googleSignIn();
+    setUser(result.user);
+    setDriveAccessToken(result.accessToken);
+    const adminStatus = await checkIsAdmin(result.user);
+    setIsAdmin(adminStatus);
+    return result.accessToken;
+  };
+
+  const handleSignOut = async () => {
+    await logout();
+    setUser(null);
+    setDriveAccessToken(null);
+    setIsAdmin(false);
+  };
+
   const handleOpenSubmit = () => {
     setActiveTab('showcase');
     setTimeout(() => {
@@ -167,21 +228,40 @@ export default function App() {
     }, 60);
   };
 
-  const handleAddSubmission = (item: StudentSubmission) => {
+  const handleAddSubmission = async (item: StudentSubmission) => {
+    if (user?.emailVerified) {
+      await createSubmissionInDb(item, user.uid);
+      if (!isSubmissionsFromDb) {
+        setSubmissions((prev) => [item, ...prev]);
+      }
+      return;
+    }
     setSubmissions((prev) => [item, ...prev]);
   };
 
-  const handleVoteSubmission = (id: string) => {
+  const handleVoteSubmission = async (id: string) => {
+    if (user?.emailVerified && isSubmissionsFromDb) {
+      await upvoteSubmissionInDb(id);
+      return;
+    }
     setSubmissions((prev) =>
       prev.map((item) => (item.id === id ? { ...item, votes: item.votes + 1 } : item))
     );
   };
 
-  const handleAddNews = (item: SchoolNewsDispatch) => {
+  const handleAddNews = async (item: SchoolNewsDispatch) => {
+    if (isAdmin && user) {
+      await saveSchoolNewsToDb(item, user.uid);
+      return;
+    }
     setSchoolNews((prev) => [item, ...prev]);
   };
 
-  const handleRemoveNews = (id: string) => {
+  const handleRemoveNews = async (id: string) => {
+    if (isAdmin && isNewsFromDb) {
+      await deleteSchoolNewsFromDb(id);
+      return;
+    }
     setSchoolNews((prev) => prev.filter((item) => item.id !== id));
   };
 
@@ -218,10 +298,14 @@ export default function App() {
     setSavedSummaries((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const publishedArticles = articles.filter((a) => a.isPublished !== false);
+  const publishedNews = schoolNews.filter((n) => n.isPublished !== false);
+  const publishedSubmissions = submissions.filter((s) => s.isPublished !== false);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FBF9F5] text-[#1C1917]">
       <TopBar
-        brandTitle={copy.brandTitle}
+        brandTitle={siteSettings.brandTitle[lang]}
         nav={copy.nav}
         ctaLabel={copy.ctaSubmit}
         activeTab={activeTab}
@@ -313,11 +397,12 @@ export default function App() {
             editionMode={editionMode}
             copy={copy.issueHeader}
             readerCopy={copy.reader}
-            schoolName={copy.schoolName}
-            slogan={copy.slogan}
-            schoolNews={schoolNews}
+            siteSettings={siteSettings}
+            articles={publishedArticles.length > 0 ? publishedArticles : ISSUE_01_ARTICLES}
+            schoolNews={publishedNews}
             bookmarkedIds={bookmarkedIds}
             readArticleIds={readArticleIds}
+            isAdmin={isAdmin}
             onToggleBookmark={handleToggleBookmark}
             onMarkRead={handleMarkRead}
             onAddNews={handleAddNews}
@@ -326,6 +411,7 @@ export default function App() {
             onOpenNuhaWithArticle={handleSummarizeWithNuha}
             onOpenNuha={() => setActiveTab('assistant')}
             onGoToLabs={() => setActiveTab('labs')}
+            onOpenAdmin={() => setActiveTab('admin')}
           />
         )}
 
@@ -333,11 +419,14 @@ export default function App() {
           <NuhaAssistantView
             lang={lang}
             copy={copy.assistant}
+            articles={publishedArticles.length > 0 ? publishedArticles : ISSUE_01_ARTICLES}
             savedSummaries={savedSummaries}
+            driveAccessToken={driveAccessToken}
             preloadedRequest={nuhaPreload}
             onConsumePreload={() => setNuhaPreload(null)}
             onSaveSummary={handleSaveSummary}
             onDeleteSummary={handleDeleteSummary}
+            onRequestDriveSignIn={handleRequestDriveSignIn}
           />
         )}
 
@@ -349,13 +438,34 @@ export default function App() {
           <ShowcaseView
             lang={lang}
             copy={copy.showcase}
-            submissions={submissions}
+            submissions={publishedSubmissions}
+            user={user}
+            onSignIn={handleSignIn}
             onAddSubmission={handleAddSubmission}
             onVoteSubmission={handleVoteSubmission}
           />
         )}
 
         {activeTab === 'launch' && <LaunchHubView lang={lang} copy={copy.launch} />}
+
+        {activeTab === 'admin' && (
+          <AdminControlPanelView
+            lang={lang}
+            user={user}
+            driveAccessToken={driveAccessToken}
+            isAdmin={isAdmin}
+            isAuthReady={isAuthReady}
+            isSettingsFromDb={isSettingsFromDb}
+            isArticlesFromDb={isArticlesFromDb}
+            isNewsFromDb={isNewsFromDb}
+            siteSettings={siteSettings}
+            articles={articles}
+            schoolNews={schoolNews}
+            submissions={submissions}
+            onSignIn={handleSignIn}
+            onSignOut={handleSignOut}
+          />
+        )}
       </main>
 
       {/* Editorial Footer */}
@@ -384,6 +494,7 @@ export default function App() {
       {/* Article Reader Modal */}
       <ArticleReaderModal
         article={selectedArticle}
+        articles={publishedArticles.length > 0 ? publishedArticles : ISSUE_01_ARTICLES}
         lang={lang}
         editionMode={editionMode}
         copy={copy.reader}

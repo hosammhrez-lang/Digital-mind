@@ -10,12 +10,12 @@ import {
 } from 'lucide-react';
 import { EditionMode, Lang, MagazineArticle } from '../types/magazine';
 import { UiCopy } from '../data/translations';
-import { ISSUE_01_ARTICLES } from '../data/magazineData';
 import { EditorialImage } from './EditorialImage';
 import { QrCodeSvg } from './QrCodeSvg';
 
 interface ArticleReaderModalProps {
   article: MagazineArticle | null;
+  articles: MagazineArticle[];
   lang: Lang;
   editionMode: EditionMode;
   copy: UiCopy['reader'];
@@ -31,6 +31,7 @@ type FontScale = 'sm' | 'md' | 'lg';
 
 export function ArticleReaderModal({
   article,
+  articles,
   lang,
   editionMode,
   copy,
@@ -76,11 +77,11 @@ export function ArticleReaderModal({
 
   if (!article) return null;
 
-  const currentIdx = ISSUE_01_ARTICLES.findIndex((a) => a.id === article.id);
-  const prevArticle = currentIdx > 0 ? ISSUE_01_ARTICLES[currentIdx - 1] : null;
+  const currentIdx = articles.findIndex((a) => a.id === article.id);
+  const prevArticle = currentIdx > 0 ? articles[currentIdx - 1] : null;
   const nextArticle =
-    currentIdx >= 0 && currentIdx < ISSUE_01_ARTICLES.length - 1
-      ? ISSUE_01_ARTICLES[currentIdx + 1]
+    currentIdx >= 0 && currentIdx < articles.length - 1
+      ? articles[currentIdx + 1]
       : null;
 
   const paragraphs = article.body[lang];
@@ -367,7 +368,7 @@ export function ArticleReaderModal({
             </button>
 
             <span className="font-mono-tabular text-xs font-semibold text-[#57534E]">
-              {String(currentIdx + 1).padStart(2, '0')} / {ISSUE_01_ARTICLES.length}
+              {String(currentIdx + 1).padStart(2, '0')} / {articles.length}
             </span>
 
             <button

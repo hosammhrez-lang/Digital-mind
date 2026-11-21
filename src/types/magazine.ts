@@ -2,7 +2,7 @@ export type Lang = 'ar' | 'en' | 'fr';
 
 export type EditionMode = 'standard' | 'junior';
 
-export type NavTab = 'issue' | 'assistant' | 'labs' | 'glossary' | 'showcase' | 'launch';
+export type NavTab = 'issue' | 'assistant' | 'labs' | 'glossary' | 'showcase' | 'launch' | 'admin';
 
 export type IssueDisplayMode = 'spread' | 'grid';
 
@@ -38,6 +38,8 @@ export interface MagazineArticle {
   body: Record<Lang, string[]>;
   keyTakeaway: TrilingualText;
   qrSlug: string;
+  sortOrder?: number;
+  isPublished?: boolean;
 }
 
 export interface PhishingEmail {
@@ -75,7 +77,9 @@ export interface StudentSubmission {
   summary: string;
   createdAt: string;
   isFeatured?: boolean;
+  isPublished?: boolean;
   votes: number;
+  ownerId?: string;
 }
 
 export interface SuggestedIdea {
@@ -106,6 +110,7 @@ export interface SchoolNewsDispatch {
   sourceUrl: string;
   imageUrl?: string;
   isPinned?: boolean;
+  isPublished?: boolean;
 }
 
 export interface ChatTurn {
@@ -122,5 +127,28 @@ export interface SavedStudySummary {
   content: string;
   createdAt: string;
   lang: Lang;
+}
+
+export interface SiteHomepageSettings {
+  brandTitle: TrilingualText;
+  schoolName: TrilingualText;
+  slogan: TrilingualText;
+  volumeLine: TrilingualText;
+  issueTitle: TrilingualText;
+  coverStoryLabel: TrilingualText;
+  heroImageUrl: string;
+  goalsTitle: TrilingualText;
+  goals: TrilingualText[];
+  isPublished: boolean;
+}
+
+export interface GoogleDriveFileItem {
+  id: string;
+  name: string;
+  mimeType: string;
+  modifiedTime?: string;
+  webViewLink?: string;
+  thumbnailLink?: string;
+  size?: string;
 }
 

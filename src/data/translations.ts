@@ -11,6 +11,7 @@ export interface UiCopy {
     glossary: string;
     showcase: string;
     launch: string;
+    admin: string;
   };
   ctaSubmit: string;
   issueHeader: {
@@ -206,6 +207,7 @@ export const UI_COPY: Record<Lang, UiCopy> = {
       glossary: 'القاموس',
       showcase: 'الإبداعات',
       launch: 'خطة الإطلاق',
+      admin: 'لوحة التحكم',
     },
     ctaSubmit: 'شارك بمشروعك',
     issueHeader: {
@@ -406,6 +408,7 @@ export const UI_COPY: Record<Lang, UiCopy> = {
       glossary: 'Glossary',
       showcase: 'Showcase',
       launch: 'Launch Hub',
+      admin: 'Control Panel',
     },
     ctaSubmit: 'Submit Project',
     issueHeader: {
@@ -606,6 +609,7 @@ export const UI_COPY: Record<Lang, UiCopy> = {
       glossary: 'Lexique',
       showcase: 'Créations',
       launch: 'Lancement',
+      admin: 'Administration',
     },
     ctaSubmit: 'Soumettre',
     issueHeader: {

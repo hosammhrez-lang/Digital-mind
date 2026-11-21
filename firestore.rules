@@ -1,0 +1,436 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny all unmatched paths by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core helper primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'hosammhrez@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidTrilingual(m, maxLen) {
+      return m is map &&
+        m.keys().hasAll(['ar', 'en', 'fr']) &&
+        m.keys().hasOnly(['ar', 'en', 'fr']) &&
+        m.ar is string && m.ar.size() >= 1 && m.ar.size() <= maxLen &&
+        m.en is string && m.en.size() >= 1 && m.en.size() <= maxLen &&
+        m.fr is string && m.fr.size() >= 1 && m.fr.size() <= maxLen;
+    }
+
+    function isValidStringList(arr, maxItems) {
+      return arr is list &&
+        arr.size() >= 1 &&
+        arr.size() <= maxItems &&
+        arr[0] is string &&
+        arr[0].size() >= 1;
+    }
+
+    // Entity 1: Homepage Settings (/site_settings/{settingId})
+    function isValidSiteSettings(data) {
+      return data.keys().hasAll([
+          'brandTitle',
+          'schoolName',
+          'slogan',
+          'volumeLine',
+          'issueTitle',
+          'coverStoryLabel',
+          'heroImageUrl',
+          'goalsTitle',
+          'goalsAr',
+          'goalsEn',
+          'goalsFr',
+          'isPublished',
+          'ownerId',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'brandTitle',
+          'schoolName',
+          'slogan',
+          'volumeLine',
+          'issueTitle',
+          'coverStoryLabel',
+          'heroImageUrl',
+          'goalsTitle',
+          'goalsAr',
+          'goalsEn',
+          'goalsFr',
+          'isPublished',
+          'ownerId',
+          'updatedBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidTrilingual(data.brandTitle, 80) &&
+        isValidTrilingual(data.schoolName, 140) &&
+        isValidTrilingual(data.slogan, 140) &&
+        isValidTrilingual(data.volumeLine, 140) &&
+        isValidTrilingual(data.issueTitle, 180) &&
+        isValidTrilingual(data.coverStoryLabel, 160) &&
+        data.heroImageUrl is string && data.heroImageUrl.size() >= 1 && data.heroImageUrl.size() <= 600 &&
+        isValidTrilingual(data.goalsTitle, 140) &&
+        isValidStringList(data.goalsAr, 10) &&
+        isValidStringList(data.goalsEn, 10) &&
+        isValidStringList(data.goalsFr, 10) &&
+        data.isPublished is bool &&
+        isValidId(data.ownerId) &&
+        isValidId(data.updatedBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /site_settings/{settingId} {
+      allow get: if isValidId(settingId) && (
+        (settingId == 'homepage' && (resource == null || existing().isPublished == true)) ||
+        isAdmin()
+      );
+      allow list: if isBootstrappedAdmin();
+      allow create: if isValidId(settingId) &&
+        isAdmin() &&
+        isValidSiteSettings(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(settingId) &&
+        isAdmin() &&
+        isValidSiteSettings(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'brandTitle',
+          'schoolName',
+          'slogan',
+          'volumeLine',
+          'issueTitle',
+          'coverStoryLabel',
+          'heroImageUrl',
+          'goalsTitle',
+          'goalsAr',
+          'goalsEn',
+          'goalsFr',
+          'isPublished',
+          'updatedBy',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // Entity 2: Magazine Articles (/articles/{articleId})
+    function isValidArticle(data) {
+      return data.keys().hasAll([
+          'departmentNumber',
+          'department',
+          'title',
+          'subtitle',
+          'juniorSummary',
+          'author',
+          'readTimeMin',
+          'tier',
+          'isBonus',
+          'imageUrl',
+          'bodyAr',
+          'bodyEn',
+          'bodyFr',
+          'keyTakeaway',
+          'qrSlug',
+          'sortOrder',
+          'isPublished',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'departmentNumber',
+          'department',
+          'title',
+          'subtitle',
+          'juniorSummary',
+          'author',
+          'readTimeMin',
+          'tier',
+          'isBonus',
+          'imageUrl',
+          'bodyAr',
+          'bodyEn',
+          'bodyFr',
+          'keyTakeaway',
+          'qrSlug',
+          'sortOrder',
+          'isPublished',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.departmentNumber is string && data.departmentNumber.size() >= 1 && data.departmentNumber.size() <= 16 &&
+        isValidTrilingual(data.department, 100) &&
+        isValidTrilingual(data.title, 200) &&
+        isValidTrilingual(data.subtitle, 400) &&
+        isValidTrilingual(data.juniorSummary, 600) &&
+        isValidTrilingual(data.author, 140) &&
+        data.readTimeMin is int && data.readTimeMin >= 1 && data.readTimeMin <= 60 &&
+        data.tier in ['lead', 'secondary', 'department'] &&
+        data.isBonus is bool &&
+        data.imageUrl is string && data.imageUrl.size() <= 600 &&
+        isValidStringList(data.bodyAr, 12) &&
+        isValidStringList(data.bodyEn, 12) &&
+        isValidStringList(data.bodyFr, 12) &&
+        isValidTrilingual(data.keyTakeaway, 300) &&
+        isValidId(data.qrSlug) &&
+        data.sortOrder is int && data.sortOrder >= 0 && data.sortOrder <= 1000 &&
+        data.isPublished is bool &&
+        isValidId(data.ownerId) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /articles/{articleId} {
+      allow get: if isValidId(articleId) && (existing().isPublished == true || isAdmin());
+      allow list: if existing().isPublished == true || isBootstrappedAdmin();
+      allow create: if isValidId(articleId) &&
+        isAdmin() &&
+        isValidArticle(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(articleId) &&
+        isAdmin() &&
+        isValidArticle(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'departmentNumber',
+          'department',
+          'title',
+          'subtitle',
+          'juniorSummary',
+          'author',
+          'readTimeMin',
+          'tier',
+          'isBonus',
+          'imageUrl',
+          'bodyAr',
+          'bodyEn',
+          'bodyFr',
+          'keyTakeaway',
+          'qrSlug',
+          'sortOrder',
+          'isPublished',
+          'updatedAt'
+        ]);
+      allow delete: if isValidId(articleId) && isAdmin();
+    }
+
+    // Entity 3: School News Dispatches (/school_news/{newsId})
+    function isValidSchoolNews(data) {
+      return data.keys().hasAll([
+          'title',
+          'summary',
+          'localizedTitle',
+          'localizedSummary',
+          'publishedDate',
+          'sourceUrl',
+          'imageUrl',
+          'isPinned',
+          'isPublished',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title',
+          'summary',
+          'localizedTitle',
+          'localizedSummary',
+          'publishedDate',
+          'sourceUrl',
+          'imageUrl',
+          'isPinned',
+          'isPublished',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 220 &&
+        data.summary is string && data.summary.size() >= 4 && data.summary.size() <= 1200 &&
+        isValidTrilingual(data.localizedTitle, 220) &&
+        isValidTrilingual(data.localizedSummary, 1200) &&
+        data.publishedDate is string && data.publishedDate.size() >= 10 && data.publishedDate.size() <= 32 && data.publishedDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+        data.sourceUrl is string && data.sourceUrl.size() >= 1 && data.sourceUrl.size() <= 600 &&
+        data.imageUrl is string && data.imageUrl.size() <= 600 &&
+        data.isPinned is bool &&
+        data.isPublished is bool &&
+        isValidId(data.ownerId) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /school_news/{newsId} {
+      allow get: if isValidId(newsId) && (existing().isPublished == true || isAdmin());
+      allow list: if existing().isPublished == true || isBootstrappedAdmin();
+      allow create: if isValidId(newsId) &&
+        isAdmin() &&
+        isValidSchoolNews(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(newsId) &&
+        isAdmin() &&
+        isValidSchoolNews(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title',
+          'summary',
+          'localizedTitle',
+          'localizedSummary',
+          'publishedDate',
+          'sourceUrl',
+          'imageUrl',
+          'isPinned',
+          'isPublished',
+          'updatedAt'
+        ]);
+      allow delete: if isValidId(newsId) && isAdmin();
+    }
+
+    // Entity 4: Student Showcase Submissions (/submissions/{submissionId})
+    function isValidSubmission(data) {
+      return data.keys().hasAll([
+          'studentName',
+          'grade',
+          'category',
+          'language',
+          'title',
+          'summary',
+          'createdDate',
+          'isFeatured',
+          'votes',
+          'isPublished',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'studentName',
+          'grade',
+          'category',
+          'language',
+          'title',
+          'summary',
+          'createdDate',
+          'isFeatured',
+          'votes',
+          'isPublished',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 120 &&
+        data.grade is string && data.grade.size() >= 1 && data.grade.size() <= 80 &&
+        data.category in ['app', 'robotics', 'game', 'idea'] &&
+        data.language in ['ar', 'en', 'fr'] &&
+        data.title is string && data.title.size() >= 4 && data.title.size() <= 200 &&
+        data.summary is string && data.summary.size() >= 10 && data.summary.size() <= 1000 &&
+        data.createdDate is string && data.createdDate.size() >= 10 && data.createdDate.size() <= 32 &&
+        data.isFeatured is bool &&
+        data.votes is int && data.votes >= 0 && data.votes <= 100000 &&
+        data.isPublished is bool &&
+        isValidId(data.ownerId) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /submissions/{submissionId} {
+      allow get: if isValidId(submissionId) && (existing().isPublished == true || isAdmin());
+      allow list: if existing().isPublished == true || isBootstrappedAdmin();
+      allow create: if isValidId(submissionId) &&
+        isVerifiedUser() &&
+        isValidSubmission(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (incoming().votes == 1 && incoming().isFeatured == false && incoming().isPublished == true)
+        );
+      allow update: if isValidId(submissionId) &&
+        isVerifiedUser() &&
+        isValidSubmission(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (
+            existing().isPublished == true &&
+            incoming().votes == existing().votes + 1 &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['votes', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(submissionId) && isAdmin();
+    }
+
+    // Entity 5: Admin Members (/admins/{adminUid}) - Strict PII isolation
+    function isValidAdminRecord(data, targetUid) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'addedBy', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'role', 'addedBy', 'createdAt']) &&
+        data.uid == targetUid &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 160 &&
+        data.role == 'admin' &&
+        isValidId(data.addedBy) &&
+        data.createdAt is timestamp;
+    }
+
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && isVerifiedUser() && (
+        request.auth.uid == adminUid || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin();
+      allow create: if isValidId(adminUid) &&
+        isAdmin() &&
+        isValidAdminRecord(incoming(), adminUid) &&
+        incoming().addedBy == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(adminUid) && isAdmin() && request.auth.uid != adminUid;
+    }
+  }
+}

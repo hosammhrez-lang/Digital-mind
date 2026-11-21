@@ -1,16 +1,20 @@
 import { useState, FormEvent } from 'react';
+import { User } from 'firebase/auth';
 import { Award, ThumbsUp, CheckCircle2 } from 'lucide-react';
 import { Lang, StudentSubmission, SubmissionCategory } from '../types/magazine';
 import { UiCopy } from '../data/translations';
 import { SUGGESTED_IDEAS } from '../data/magazineData';
 import { createSubmissionRecord, validateSubmission } from '../utils/magazineLogic';
+import { GoogleSignInButton } from './GoogleSignInButton';
 
 interface ShowcaseViewProps {
   lang: Lang;
   copy: UiCopy['showcase'];
   submissions: StudentSubmission[];
-  onAddSubmission: (item: StudentSubmission) => void;
-  onVoteSubmission: (id: string) => void;
+  user: User | null;
+  onSignIn: () => Promise<void>;
+  onAddSubmission: (item: StudentSubmission) => Promise<void> | void;
+  onVoteSubmission: (id: string) => Promise<void> | void;
 }
 
 type FilterCategory = 'all' | SubmissionCategory;
@@ -19,10 +23,14 @@ export function ShowcaseView({
   lang,
   copy,
   submissions,
+  user,
+  onSignIn,
   onAddSubmission,
   onVoteSubmission,
 }: ShowcaseViewProps) {
   const [filter, setFilter] = useState<FilterCategory>('all');
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
 
   // Form state
   const [studentName, setStudentName] = useState('');
@@ -39,9 +47,22 @@ export function ShowcaseView({
       ? submissions
       : submissions.filter((item) => item.category === filter);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleTriggerSignIn = async () => {
+    setSigningIn(true);
+    setAuthNotice(null);
+    try {
+      await onSignIn();
+    } catch (err) {
+      setAuthNotice(err instanceof Error ? err.message : 'Sign-in failed.');
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitSuccess(false);
+    setAuthNotice(null);
 
     const validation = validateSubmission({
       studentName,
@@ -71,7 +92,7 @@ export function ShowcaseView({
       summary,
     });
 
-    onAddSubmission(record);
+    await onAddSubmission(record);
     setErrors({});
     setStudentName('');
     setGrade('');
@@ -194,7 +215,19 @@ export function ShowcaseView({
 
                 <button
                   type="button"
-                  onClick={() => onVoteSubmission(item.id)}
+                  onClick={() => {
+                    if (!user?.emailVerified) {
+                      setAuthNotice(
+                        lang === 'ar'
+                          ? 'يرجى تسجيل الدخول بحساب Google للتصويت وحفظ الإعجاب في قاعدة البيانات.'
+                          : lang === 'fr'
+                            ? 'Connectez-vous avec Google pour voter.'
+                            : 'Sign in with Google to upvote projects in the live database.'
+                      );
+                      return;
+                    }
+                    void onVoteSubmission(item.id);
+                  }}
                   aria-label={`${copy.upvote} ${item.title}`}
                   className="inline-flex items-center gap-1.5 rounded-md border border-[#E5E0D8] bg-[#FBF9F5] px-2.5 py-1 text-xs font-medium text-[#1C1917] hover:border-[#1E3A8A] hover:text-[#1E3A8A] transition-colors cursor-pointer shrink-0"
                 >
@@ -205,6 +238,20 @@ export function ShowcaseView({
             </article>
           ))}
         </div>
+
+        {authNotice && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#1E3A8A]/30 bg-white px-4 py-3 text-xs sm:text-sm text-[#1E3A8A]"
+          >
+            <span>{authNotice}</span>
+            <GoogleSignInButton
+              label={lang === 'ar' ? 'تسجيل الدخول بـ Google' : 'Sign in with Google'}
+              loading={signingIn}
+              onClick={handleTriggerSignIn}
+            />
+          </div>
+        )}
       </section>
 
       {/* Live Student Project & Idea Submission Form */}
@@ -213,13 +260,24 @@ export function ShowcaseView({
         aria-labelledby="submission-form-heading"
         className="scroll-mt-8 rounded-md border border-[#E5E0D8] bg-white p-6 sm:p-8"
       >
-        <h2
-          id="submission-form-heading"
-          className="font-display text-xl sm:text-2xl font-semibold text-[#1C1917]"
-        >
-          {copy.formTitle}
-        </h2>
-        <p className="mt-1 text-sm text-[#57534E]">{copy.formSubtitle}</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2
+              id="submission-form-heading"
+              className="font-display text-xl sm:text-2xl font-semibold text-[#1C1917]"
+            >
+              {copy.formTitle}
+            </h2>
+            <p className="mt-1 text-sm text-[#57534E]">{copy.formSubtitle}</p>
+          </div>
+          {!user?.emailVerified && (
+            <GoogleSignInButton
+              label={lang === 'ar' ? 'تسجيل الدخول للحفظ في السحابة' : 'Sign in with Google'}
+              loading={signingIn}
+              onClick={handleTriggerSignIn}
+            />
+          )}
+        </div>
 
         {submitSuccess && (
           <div

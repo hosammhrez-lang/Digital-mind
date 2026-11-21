@@ -9,6 +9,8 @@ import { QrCodeSvg } from './QrCodeSvg';
 interface SchoolNewsSectionProps {
   lang: Lang;
   dispatches: SchoolNewsDispatch[];
+  isAdmin?: boolean;
+  onOpenAdmin?: () => void;
   onAddDispatch: (item: SchoolNewsDispatch) => void;
   onRemoveDispatch: (id: string) => void;
 }
@@ -120,6 +122,8 @@ const NEWS_COPY: Record<
 export function SchoolNewsSection({
   lang,
   dispatches,
+  isAdmin = false,
+  onOpenAdmin,
   onAddDispatch,
   onRemoveDispatch,
 }: SchoolNewsSectionProps) {
@@ -238,6 +242,25 @@ export function SchoolNewsSection({
           noValidate
           className="rounded-md border border-[#D6CEBE] bg-[#FBF9F5] p-5 space-y-4"
         >
+          {!isAdmin && onOpenAdmin && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#1E3A8A]/25 bg-white px-4 py-2.5 text-xs text-[#57534E]">
+              <span>
+                {lang === 'ar'
+                  ? 'معاينة محلية: لنشر الخبر في قاعدة البيانات الدائمة للجميع، سجّل الدخول كمشرف في وحدة التحكم.'
+                  : lang === 'fr'
+                    ? 'Aperçu local : connectez-vous en tant qu’administrateur pour publier dans la base de données.'
+                    : 'Local preview mode: sign in as Admin in the Control Panel to save news permanently to Firestore.'}
+              </span>
+              <button
+                type="button"
+                onClick={onOpenAdmin}
+                className="font-semibold text-[#1E3A8A] hover:underline cursor-pointer shrink-0"
+              >
+                {lang === 'ar' ? 'فتح وحدة التحكم' : lang === 'fr' ? 'Ouvrir l’administration' : 'Open Control Panel'}
+              </button>
+            </div>
+          )}
+
           {savedNotice && (
             <div
               role="status"
@@ -391,7 +414,7 @@ export function SchoolNewsSection({
                           {copy.photoSourceLabel}
                         </span>
                       )}
-                      {!item.isPinned && (
+                      {!item.isPinned && isAdmin && (
                         <button
                           type="button"
                           onClick={() => onRemoveDispatch(item.id)}

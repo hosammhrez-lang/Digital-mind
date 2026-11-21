@@ -19,9 +19,10 @@ import {
   Lang,
   MagazineArticle,
   SchoolNewsDispatch,
+  SiteHomepageSettings,
 } from '../types/magazine';
 import { UiCopy } from '../data/translations';
-import { ISSUE_01_ARTICLES, MAGAZINE_GOALS, SCHOOL_LOGO_URL } from '../data/magazineData';
+import { SCHOOL_LOGO_URL } from '../data/magazineData';
 import { clampFlipbookPage } from '../utils/magazineLogic';
 import { EditorialImage } from './EditorialImage';
 import { QrCodeSvg } from './QrCodeSvg';
@@ -32,11 +33,12 @@ interface IssueViewProps {
   editionMode: EditionMode;
   copy: UiCopy['issueHeader'];
   readerCopy: UiCopy['reader'];
-  schoolName: string;
-  slogan: string;
+  siteSettings: SiteHomepageSettings;
+  articles: MagazineArticle[];
   schoolNews: SchoolNewsDispatch[];
   bookmarkedIds: string[];
   readArticleIds: string[];
+  isAdmin: boolean;
   onToggleBookmark: (id: string) => void;
   onMarkRead: (id: string) => void;
   onAddNews: (item: SchoolNewsDispatch) => void;
@@ -45,6 +47,7 @@ interface IssueViewProps {
   onOpenNuhaWithArticle: (articleId: string) => void;
   onOpenNuha: () => void;
   onGoToLabs: () => void;
+  onOpenAdmin: () => void;
 }
 
 export function IssueView({
@@ -52,11 +55,12 @@ export function IssueView({
   editionMode,
   copy,
   readerCopy,
-  schoolName,
-  slogan,
+  siteSettings,
+  articles,
   schoolNews,
   bookmarkedIds,
   readArticleIds,
+  isAdmin,
   onToggleBookmark,
   onMarkRead,
   onAddNews,
@@ -65,6 +69,7 @@ export function IssueView({
   onOpenNuhaWithArticle,
   onOpenNuha,
   onGoToLabs,
+  onOpenAdmin,
 }: IssueViewProps) {
   const [displayMode, setDisplayMode] = useState<IssueDisplayMode>('spread');
   const [pageIndex, setPageIndex] = useState(0);
@@ -73,11 +78,11 @@ export function IssueView({
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   const visibleArticles = savedOnly
-    ? ISSUE_01_ARTICLES.filter((a) => bookmarkedIds.includes(a.id))
-    : ISSUE_01_ARTICLES;
+    ? articles.filter((a) => bookmarkedIds.includes(a.id))
+    : articles;
 
   const safeIndex = clampFlipbookPage(pageIndex, visibleArticles.length);
-  const currentArticle = visibleArticles[safeIndex] ?? ISSUE_01_ARTICLES[0];
+  const currentArticle = visibleArticles[safeIndex] ?? articles[0];
 
   const stopSpeech = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -124,29 +129,31 @@ export function IssueView({
     setIsSpeaking(true);
   };
 
-  const leadArticle = ISSUE_01_ARTICLES.find((a) => a.tier === 'lead') ?? ISSUE_01_ARTICLES[0];
-  const secondaryArticles = ISSUE_01_ARTICLES.filter((a) => a.tier === 'secondary');
-  const departmentArticles = ISSUE_01_ARTICLES.filter((a) => a.tier === 'department');
-  const readPercent = Math.round((readArticleIds.length / ISSUE_01_ARTICLES.length) * 100);
+  const leadArticle = articles.find((a) => a.tier === 'lead') ?? articles[0];
+  const secondaryArticles = articles.filter((a) => a.tier === 'secondary');
+  const departmentArticles = articles.filter((a) => a.tier === 'department');
+  const totalCount = Math.max(articles.length, 1);
+  const readCount = readArticleIds.filter((id) => articles.some((a) => a.id === id)).length;
+  const readPercent = Math.round((readCount / totalCount) * 100);
 
   const kpiItems =
     lang === 'ar'
       ? [
-          { value: '12', label: 'صفحة رقمية تفاعلية في العدد' },
-          { value: `${readArticleIds.length}/12`, label: 'تقدّمك في قراءة المجلة' },
+          { value: String(articles.length).padStart(2, '0'), label: 'صفحة رقمية تفاعلية في العدد' },
+          { value: `${readCount}/${articles.length}`, label: 'تقدّمك في قراءة المجلة' },
           { value: '15', label: 'مصطلحًا بثلاث لغات' },
           { value: '01', label: 'المساعد الذكي «نُهى» للدراسة' },
         ]
       : lang === 'fr'
         ? [
-            { value: '12', label: 'Pages interactives du numéro' },
-            { value: `${readArticleIds.length}/12`, label: 'Progression de lecture' },
+            { value: String(articles.length).padStart(2, '0'), label: 'Pages interactives du numéro' },
+            { value: `${readCount}/${articles.length}`, label: 'Progression de lecture' },
             { value: '15', label: 'Termes en trois langues' },
             { value: '01', label: 'Assistant d’étude IA Nuha' },
           ]
         : [
-            { value: '12', label: 'Interactive E-Magazine Pages' },
-            { value: `${readArticleIds.length}/12`, label: 'Your Issue Reading Progress' },
+            { value: String(articles.length).padStart(2, '0'), label: 'Interactive E-Magazine Pages' },
+            { value: `${readCount}/${articles.length}`, label: 'Your Issue Reading Progress' },
             { value: '15', label: 'Trilingual Tech Glossary Terms' },
             { value: '01', label: 'Nuha Personal AI Study Tutor' },
           ];
@@ -160,13 +167,13 @@ export function IssueView({
         <div className="lg:col-span-6 flex flex-col justify-between gap-6">
           <div>
             <p className="text-xs font-mono-tabular font-semibold text-[#1E3A8A] tracking-wide">
-              {copy.volumeLine}
+              {siteSettings.volumeLine[lang]}
             </p>
             <h1
               className="mt-3 font-display text-3xl sm:text-4xl lg:text-[2.75rem] font-semibold text-[#1C1917] leading-[1.15]"
               style={{ textWrap: 'balance' }}
             >
-              {copy.issueTitle}
+              {siteSettings.issueTitle[lang]}
             </h1>
             <div className="mt-4 flex items-center gap-3 max-w-xl">
               <img
@@ -176,7 +183,8 @@ export function IssueView({
                 className="w-12 h-12 rounded-full object-contain border border-[#E5E0D8] bg-white p-0.5 shrink-0"
               />
               <p className="text-sm sm:text-base text-[#57534E] leading-relaxed">
-                {schoolName} — <span className="font-medium text-[#1C1917]">{slogan}</span>
+                {siteSettings.schoolName[lang]} —{' '}
+                <span className="font-medium text-[#1C1917]">{siteSettings.slogan[lang]}</span>
               </p>
             </div>
 
@@ -184,7 +192,7 @@ export function IssueView({
             <div className="mt-6 rounded-md border border-[#E5E0D8] bg-white p-4 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-[#1C1917]">
-                  {readArticleIds.length} / {ISSUE_01_ARTICLES.length} {copy.readProgress}
+                  {readCount} / {articles.length} {copy.readProgress}
                 </span>
                 <span className="font-mono-tabular font-semibold text-[#1E3A8A]">
                   {readPercent}%
@@ -248,34 +256,24 @@ export function IssueView({
 
             <div className="relative flex-1 overflow-hidden rounded-md border border-[#E5E0D8] bg-[#EFECE5]">
               <EditorialImage
-                src="/src/assets/images/hero_digital_minds_1795166809525.jpg"
-                alt={
-                  lang === 'ar'
-                    ? 'غلاف العدد الأول من مجلة عقول رقمية الإلكترونية'
-                    : lang === 'fr'
-                      ? 'Couverture du Numéro 01 d’Esprits Numériques'
-                      : 'Digital Minds Issue 01 Interactive E-Magazine Cover'
-                }
+                src={siteSettings.heroImageUrl || '/src/assets/images/hero_digital_minds_1795166809525.jpg'}
+                alt={siteSettings.issueTitle[lang]}
                 className="w-full h-64 sm:h-80 lg:h-full object-cover"
               />
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#57534E]">
-              <span>
-                {lang === 'ar'
-                  ? 'مقال الغلاف: كيف يساعدنا الذكاء الاصطناعي؟'
-                  : lang === 'fr'
-                    ? 'À la une : L’IA au service des élèves'
-                    : 'Cover Story: Learning Smarter with AI'}
-              </span>
-              <button
-                type="button"
-                onClick={() => onOpenArticle(leadArticle)}
-                className="inline-flex items-center gap-1 font-semibold text-[#1E3A8A] hover:underline cursor-pointer"
-              >
-                <span>{copy.readArticle}</span>
-                <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
+              <span>{siteSettings.coverStoryLabel[lang]}</span>
+              {leadArticle && (
+                <button
+                  type="button"
+                  onClick={() => onOpenArticle(leadArticle)}
+                  className="inline-flex items-center gap-1 font-semibold text-[#1E3A8A] hover:underline cursor-pointer"
+                >
+                  <span>{copy.readArticle}</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -841,20 +839,22 @@ export function IssueView({
       <SchoolNewsSection
         lang={lang}
         dispatches={schoolNews}
+        isAdmin={isAdmin}
+        onOpenAdmin={onOpenAdmin}
         onAddDispatch={onAddNews}
         onRemoveDispatch={onRemoveNews}
       />
 
-      {/* Seven Guiding Goals */}
+      {/* Guiding Goals (Editable from Control Panel) */}
       <section aria-labelledby="goals-heading" className="rounded-md border border-[#E5E0D8] bg-white p-6 sm:p-8">
         <h2 id="goals-heading" className="font-display text-xl sm:text-2xl font-semibold text-[#1C1917]">
-          {copy.goalsTitle}
+          {siteSettings.goalsTitle[lang]}
         </h2>
         <ol className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
-          {MAGAZINE_GOALS.map((goal, idx) => (
+          {siteSettings.goals.map((goal, idx) => (
             <li key={idx} className="flex items-baseline gap-3 border-b border-[#F2EFE9] pb-3">
               <span className="font-mono-tabular text-xs font-semibold text-[#1E3A8A] shrink-0">
-                0{idx + 1}.
+                {String(idx + 1).padStart(2, '0')}.
               </span>
               <span className="text-sm text-[#1C1917] leading-relaxed">{goal[lang]}</span>
             </li>

@@ -13,7 +13,7 @@ interface TopBarProps {
   onOpenSubmit: () => void;
 }
 
-const TAB_ORDER: NavTab[] = ['issue', 'assistant', 'labs', 'glossary', 'showcase', 'launch'];
+const TAB_ORDER: NavTab[] = ['issue', 'assistant', 'labs', 'glossary', 'showcase', 'launch', 'admin'];
 
 export function TopBar({
   brandTitle,
@@ -32,12 +32,12 @@ export function TopBar({
 
   return (
     <header className="no-print border-b border-[#E5E0D8] bg-[#FBF9F5]">
-      <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-8 px-4 sm:px-6 py-4">
+      <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6 py-4">
         {/* Zone 1: School Crest + Single-line Brand Wordmark */}
         <button
           type="button"
           onClick={() => handleNav('issue')}
-          className="inline-flex items-center gap-2.5 font-display text-xl sm:text-2xl font-semibold tracking-tight text-[#1C1917] whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1E3A8A]"
+          className="inline-flex items-center gap-2.5 font-display text-lg sm:text-xl lg:text-2xl font-semibold tracking-tight text-[#1C1917] whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1E3A8A]"
         >
           <img
             src={SCHOOL_LOGO_URL}
@@ -49,10 +49,10 @@ export function TopBar({
           <span>{brandTitle}</span>
         </button>
 
-        {/* Zone 2: 5 concise single-line text nav links */}
+        {/* Zone 2: Single-line text nav links */}
         <nav
           aria-label="Primary navigation"
-          className="hidden md:flex items-center gap-6 text-sm font-medium"
+          className="hidden md:flex items-center gap-4 lg:gap-5 text-xs lg:text-sm font-medium"
         >
           {TAB_ORDER.map((tab) => {
             const isActive = activeTab === tab;

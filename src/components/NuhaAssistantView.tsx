@@ -4,6 +4,7 @@ import {
   Check,
   Copy,
   FileText,
+  HardDrive,
   HelpCircle,
   Layers,
   MessageSquare,
@@ -20,13 +21,15 @@ import {
   StudyMode,
 } from '../types/magazine';
 import { UiCopy } from '../data/translations';
-import { ISSUE_01_ARTICLES } from '../data/magazineData';
+import { uploadFileToDrive } from '../services/driveService';
 import { createSavedSummaryRecord, validateStudyInput } from '../utils/magazineLogic';
 
 interface NuhaAssistantViewProps {
   lang: Lang;
   copy: UiCopy['assistant'];
+  articles: MagazineArticle[];
   savedSummaries: SavedStudySummary[];
+  driveAccessToken: string | null;
   preloadedRequest: {
     articleId: string;
     mode: StudyMode;
@@ -36,6 +39,7 @@ interface NuhaAssistantViewProps {
   onConsumePreload: () => void;
   onSaveSummary: (item: SavedStudySummary) => void;
   onDeleteSummary: (id: string) => void;
+  onRequestDriveSignIn: () => Promise<string | null>;
 }
 
 function FormattedStudyText({ text }: { text: string }) {
@@ -101,11 +105,14 @@ function FormattedStudyText({ text }: { text: string }) {
 export function NuhaAssistantView({
   lang,
   copy,
+  articles,
   savedSummaries,
+  driveAccessToken,
   preloadedRequest,
   onConsumePreload,
   onSaveSummary,
   onDeleteSummary,
+  onRequestDriveSignIn,
 }: NuhaAssistantViewProps) {
   const [mode, setMode] = useState<StudyMode>('summarize');
   const [selectedArticleId, setSelectedArticleId] = useState('');
@@ -122,6 +129,8 @@ export function NuhaAssistantView({
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
   const [copied, setCopied] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [driveSaving, setDriveSaving] = useState(false);
+  const [driveNotice, setDriveNotice] = useState<{ text: string; url?: string } | null>(null);
 
   const buildArticleSource = (article: MagazineArticle, activeLang: Lang): string => {
     const paragraphs = article.body[activeLang].join('\n\n');
@@ -209,7 +218,7 @@ export function NuhaAssistantView({
 
   useEffect(() => {
     if (!preloadedRequest) return;
-    const article = ISSUE_01_ARTICLES.find((a) => a.id === preloadedRequest.articleId);
+    const article = articles.find((a) => a.id === preloadedRequest.articleId);
     if (!article) {
       onConsumePreload();
       return;
@@ -242,7 +251,7 @@ export function NuhaAssistantView({
 
   const handleArticlePick = (articleId: string) => {
     setSelectedArticleId(articleId);
-    const found = ISSUE_01_ARTICLES.find((a) => a.id === articleId);
+    const found = articles.find((a) => a.id === articleId);
     if (!found) return;
     setSourceText(buildArticleSource(found, lang));
     setSubject(found.department[lang]);
@@ -271,10 +280,10 @@ export function NuhaAssistantView({
   const handleQuickStarter = (starter: string) => {
     setPrompt(starter);
     if (starter.toLowerCase().includes('hc-sr04')) {
-      const robotics = ISSUE_01_ARTICLES.find((a) => a.id === 'robotics-innovation');
+      const robotics = articles.find((a) => a.id === 'robotics-innovation');
       if (robotics) setSourceText(buildArticleSource(robotics, lang));
     } else if (starter.includes('العدد الأول') || starter.includes('Issue 01') || starter.includes('Numéro 01')) {
-      const aiArt = ISSUE_01_ARTICLES.find((a) => a.id === 'ai-corner');
+      const aiArt = articles.find((a) => a.id === 'ai-corner');
       if (aiArt) setSourceText(buildArticleSource(aiArt, lang));
     }
   };
@@ -310,6 +319,55 @@ export function NuhaAssistantView({
     });
     onSaveSummary(record);
     setSavedNotice(true);
+  };
+
+  const handleSaveToGoogleDrive = async () => {
+    if (!activeDisplayText || driveSaving) return;
+    setDriveNotice(null);
+    setApiError(null);
+    setDriveSaving(true);
+    try {
+      let token = driveAccessToken;
+      if (!token) {
+        token = await onRequestDriveSignIn();
+      }
+      if (!token) {
+        setDriveNotice({
+          text:
+            lang === 'ar'
+              ? 'يرجى تسجيل الدخول بحساب Google لمنح صلاحية حفظ الملف في Drive.'
+              : lang === 'fr'
+                ? 'Connectez-vous avec Google pour enregistrer dans Drive.'
+                : 'Sign in with Google to authorize saving to Google Drive.',
+        });
+        return;
+      }
+      const safeTitle = (outputTitle || prompt || 'nuha-study-notes')
+        .trim()
+        .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+        .slice(0, 48) || 'nuha-study-notes';
+      const fileName = `${safeTitle}-${new Date().toISOString().slice(0, 10)}.txt`;
+      const header = `Digital Minds — Nuha Study Notes\nSubject: ${subject || 'General'}\nGrade: ${gradeLevel || 'ELS'}\n\n`;
+      const uploaded = await uploadFileToDrive({
+        token,
+        fileName,
+        content: header + activeDisplayText,
+        mimeType: 'text/plain',
+      });
+      setDriveNotice({
+        text:
+          lang === 'ar'
+            ? `تم حفظ الملخص في Google Drive باسم «${uploaded.name}».`
+            : lang === 'fr'
+              ? `Enregistré sur Google Drive sous « ${uploaded.name} ».`
+              : `Saved to Google Drive as "${uploaded.name}".`,
+        url: uploaded.webViewLink,
+      });
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : 'Google Drive upload failed.');
+    } finally {
+      setDriveSaving(false);
+    }
   };
 
   const modes: { id: StudyMode; label: string; icon: typeof FileText }[] = [
@@ -406,7 +464,7 @@ export function NuhaAssistantView({
               className="w-full rounded-md border border-[#D6CEBE] bg-[#FBF9F5] px-3.5 py-2 text-sm text-[#1C1917] focus:border-[#1E3A8A] focus:outline-none"
             >
               <option value="">{copy.articlePickerPlaceholder}</option>
-              {ISSUE_01_ARTICLES.map((art) => (
+              {articles.map((art) => (
                 <option key={art.id} value={art.id}>
                   {art.departmentNumber} — {art.title[lang]}
                 </option>
@@ -566,6 +624,28 @@ export function NuhaAssistantView({
 
                   <button
                     type="button"
+                    onClick={handleSaveToGoogleDrive}
+                    disabled={driveSaving}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[#1E3A8A]/30 bg-white px-3 py-1.5 text-xs font-semibold text-[#1E3A8A] hover:bg-[#1E3A8A]/5 disabled:opacity-60 cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <HardDrive className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>
+                      {driveSaving
+                        ? lang === 'ar'
+                          ? 'جاري الحفظ...'
+                          : lang === 'fr'
+                            ? 'Envoi...'
+                            : 'Saving...'
+                        : lang === 'ar'
+                          ? 'حفظ في Google Drive'
+                          : lang === 'fr'
+                            ? 'Enregistrer sur Drive'
+                            : 'Save to Google Drive'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => window.print()}
                     className="inline-flex items-center gap-1.5 rounded-md border border-[#D6CEBE] bg-[#FBF9F5] px-3 py-1.5 text-xs font-medium text-[#1C1917] hover:bg-[#F2EFE9] cursor-pointer whitespace-nowrap shrink-0"
                   >
@@ -582,6 +662,25 @@ export function NuhaAssistantView({
                 className="no-print mt-4 rounded-md border border-[#14532D]/30 bg-[#14532D]/5 px-4 py-2.5 text-xs sm:text-sm font-medium text-[#14532D]"
               >
                 {copy.savedToast}
+              </div>
+            )}
+
+            {driveNotice && (
+              <div
+                role="status"
+                className="no-print mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#1E3A8A]/30 bg-[#1E3A8A]/5 px-4 py-2.5 text-xs sm:text-sm font-medium text-[#1E3A8A]"
+              >
+                <span>{driveNotice.text}</span>
+                {driveNotice.url && (
+                  <a
+                    href={driveNotice.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline font-semibold"
+                  >
+                    {lang === 'ar' ? 'فتح في Drive' : lang === 'fr' ? 'Ouvrir dans Drive' : 'Open in Drive'}
+                  </a>
+                )}
               </div>
             )}
 

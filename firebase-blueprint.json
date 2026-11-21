@@ -1,0 +1,425 @@
+{
+  "entities": {
+    "SiteHomepageSettings": {
+      "title": "SiteHomepageSettings",
+      "description": "Editable configuration controlling the main homepage hero, magazine masthead, and seven guiding goals.",
+      "type": "object",
+      "properties": {
+        "brandTitle": {
+          "type": "object",
+          "description": "Trilingual magazine brand title map (ar, en, fr).",
+          "maxLength": 80
+        },
+        "schoolName": {
+          "type": "object",
+          "description": "Trilingual school name map (ar, en, fr).",
+          "maxLength": 140
+        },
+        "slogan": {
+          "type": "object",
+          "description": "Trilingual slogan map (ar, en, fr).",
+          "maxLength": 140
+        },
+        "volumeLine": {
+          "type": "object",
+          "description": "Trilingual issue volume badge line (ar, en, fr).",
+          "maxLength": 140
+        },
+        "issueTitle": {
+          "type": "object",
+          "description": "Trilingual hero headline for the current issue (ar, en, fr).",
+          "maxLength": 180
+        },
+        "coverStoryLabel": {
+          "type": "object",
+          "description": "Trilingual cover story caption below the cover frame (ar, en, fr).",
+          "maxLength": 160
+        },
+        "heroImageUrl": {
+          "type": "string",
+          "description": "Hero cover image URL or local asset path.",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "goalsTitle": {
+          "type": "object",
+          "description": "Trilingual title for the guiding goals section (ar, en, fr).",
+          "maxLength": 140
+        },
+        "goalsAr": {
+          "type": "array",
+          "description": "Arabic guiding goals list shown on the homepage (max 10)."
+        },
+        "goalsEn": {
+          "type": "array",
+          "description": "English guiding goals list shown on the homepage (max 10)."
+        },
+        "goalsFr": {
+          "type": "array",
+          "description": "French guiding goals list shown on the homepage (max 10)."
+        },
+        "isPublished": {
+          "type": "boolean",
+          "description": "Whether homepage settings are publicly visible."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the admin who created the settings document.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "UID of the last admin to update homepage settings.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last modification."
+        }
+      },
+      "required": [
+        "brandTitle",
+        "schoolName",
+        "slogan",
+        "volumeLine",
+        "issueTitle",
+        "coverStoryLabel",
+        "heroImageUrl",
+        "goalsTitle",
+        "goalsAr",
+        "goalsEn",
+        "goalsFr",
+        "isPublished",
+        "ownerId",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MagazineArticleRecord": {
+      "title": "MagazineArticleRecord",
+      "description": "Editable magazine article/page displayed in the interactive flipbook and full grid.",
+      "type": "object",
+      "properties": {
+        "departmentNumber": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "department": {
+          "type": "object",
+          "maxLength": 100
+        },
+        "title": {
+          "type": "object",
+          "maxLength": 200
+        },
+        "subtitle": {
+          "type": "object",
+          "maxLength": 400
+        },
+        "juniorSummary": {
+          "type": "object",
+          "maxLength": 600
+        },
+        "author": {
+          "type": "object",
+          "maxLength": 140
+        },
+        "readTimeMin": {
+          "type": "integer"
+        },
+        "tier": {
+          "type": "string",
+          "enum": ["lead", "secondary", "department"]
+        },
+        "isBonus": {
+          "type": "boolean"
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "bodyAr": {
+          "type": "array"
+        },
+        "bodyEn": {
+          "type": "array"
+        },
+        "bodyFr": {
+          "type": "array"
+        },
+        "keyTakeaway": {
+          "type": "object",
+          "maxLength": 300
+        },
+        "qrSlug": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sortOrder": {
+          "type": "integer"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "departmentNumber",
+        "department",
+        "title",
+        "subtitle",
+        "juniorSummary",
+        "author",
+        "readTimeMin",
+        "tier",
+        "isBonus",
+        "imageUrl",
+        "bodyAr",
+        "bodyEn",
+        "bodyFr",
+        "keyTakeaway",
+        "qrSlug",
+        "sortOrder",
+        "isPublished",
+        "ownerId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SchoolNewsRecord": {
+      "title": "SchoolNewsRecord",
+      "description": "School news dispatch displayed on the main homepage feed.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 220
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 1200
+        },
+        "localizedTitle": {
+          "type": "object",
+          "maxLength": 220
+        },
+        "localizedSummary": {
+          "type": "object",
+          "maxLength": 1200
+        },
+        "publishedDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 32,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "sourceUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "isPinned": {
+          "type": "boolean"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "localizedTitle",
+        "localizedSummary",
+        "publishedDate",
+        "sourceUrl",
+        "imageUrl",
+        "isPinned",
+        "isPublished",
+        "ownerId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudentSubmissionRecord": {
+      "title": "StudentSubmissionRecord",
+      "description": "Student project or editorial idea entry displayed in the showcase.",
+      "type": "object",
+      "properties": {
+        "studentName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "grade": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "category": {
+          "type": "string",
+          "enum": ["app", "robotics", "game", "idea"]
+        },
+        "language": {
+          "type": "string",
+          "enum": ["ar", "en", "fr"]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 200
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 1000
+        },
+        "createdDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 32,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "votes": {
+          "type": "integer"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "studentName",
+        "grade",
+        "category",
+        "language",
+        "title",
+        "summary",
+        "createdDate",
+        "isFeatured",
+        "votes",
+        "isPublished",
+        "ownerId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminMemberRecord": {
+      "title": "AdminMemberRecord",
+      "description": "Authorized admin record granting full homepage CMS editing rights.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin"]
+        },
+        "addedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "role", "addedBy", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/site_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteHomepageSettings" },
+      "description": "Stores global homepage configuration at document ID 'homepage'."
+    },
+    "/articles/{articleId}": {
+      "schema": { "$ref": "#/entities/MagazineArticleRecord" },
+      "description": "Stores editable magazine articles and flipbook pages."
+    },
+    "/school_news/{newsId}": {
+      "schema": { "$ref": "#/entities/SchoolNewsRecord" },
+      "description": "Stores school Facebook & campus news dispatches."
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/StudentSubmissionRecord" },
+      "description": "Stores student projects and editorial showcase entries."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminMemberRecord" },
+      "description": "Stores delegated admin UIDs with strict owner/admin PII protection."
+    }
+  }
+}
